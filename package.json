@@ -6,10 +6,16 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
-  "keywords": [],
+  "keywords": [
+    "stripe",
+    "webhooks",
+    "express",
+    "payments",
+    "ecommerce"
+  ],
   "author": "",
-  "license": "ISC",
-  "description": "",
+  "license": "MIT",
+  "description": "Event driven Node.js backend that verifies Stripe webhook signatures and fulfills orders",
   "dependencies": {
     "body-parser": "^2.2.2",
     "express": "^5.2.1",

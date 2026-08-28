@@ -1,45 +1,117 @@
 # E-Commerce Stripe Webhooks Engine
 
-A resilient event-driven Node.js backend that securely interfaces with the **Stripe API** to bridge online payments with local database state machines. This project proves an understanding of Stripe's webhook architecture for real-world e-commerce scale.
+An event driven Node.js backend that connects Stripe payments to local order state. The service verifies webhook signatures with the raw body, handles lifecycle events, and fulfills orders only after payment confirmation.
 
-## Core Features
-1. **Checkout Session Creation**: Mocks generating Stripe Checkout Session tokens securely from the backend.
-2. **Webhook Verification**: Uses `express.raw()` payloads to parse secure asymmetric signature payloads directly from Stripe `stripe-signature` headers.
-3. **Event-Driven Architecture**: Uses an event switch-case state machine to handle the lifecycle of `checkout.session.completed` and `payment_intent.succeeded`.
-4. **Order Fulfillment**: Extracts `customer_details.email` strictly after payment confirmation to build secure digital delivery pipelines.
+The engine separates payment acceptance from order logic, so the store can rely on Stripe as the source of truth and keep the database consistent.
 
-## Tech Stack
-- **Environment:** Node.js (v20+)
-- **Framework:** Express.js 
-- **Packages:** `stripe`, `body-parser`
+## Why this exists
 
-## How to Run Locally
+Client side payment confirmation can be spoofed. A secure backend must verify the Stripe signature on the raw payload and drive state transitions from webhook events. This repo shows that pattern in a small, readable service.
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Start the Express server:
-   ```bash
-   node server.js
-   ```
-   *The server runs on port 4242.*
+## What it does
 
-## Testing with an Active Stripe CLI (Or cURL)
+- Creates mock Checkout Sessions from the backend
+- Verifies `stripe-signature` on the raw body for `POST /webhook`
+- Handles `checkout.session.completed` and `payment_intent.succeeded` via an event switch
+- Fulfills orders after extracting `customer_details.email` only on confirmed payment
+- Uses `express.raw()` for the webhook route and `express.json()` for normal routes
 
-To simulate a successful end-to-end webhook event bypassing the Stripe CLI, run this payload simulation command against your local server:
+## Project structure
+
+```text
+.
+├── server.js          # Express app with webhook and checkout session routes
+├── package.json
+└── README.md
+```
+
+## Prerequisites
+
+- Node 20 or later
+- Stripe CLI for local webhook forwarding, or curl for simulation
+
+## Installation
+
+```bash
+git clone https://github.com/mastaan66/E-Commerce-Stripe-Webhooks-Engine.git
+cd E-Commerce-Stripe-Webhooks-Engine
+
+npm install
+```
+
+Create an `.env` file
+
+```text
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+PORT=4242
+```
+
+The current `server.js:1` uses mock keys for demonstration. Replace them with `process.env.STRIPE_SECRET_KEY` and `process.env.STRIPE_WEBHOOK_SECRET` before using real Stripe accounts.
+
+## Usage
+
+Start the server
+
+```bash
+npm start
+# or
+node server.js
+```
+
+The server runs on port 4242.
+
+Create a Checkout Session
+
+```bash
+curl -i -X POST http://localhost:4242/create-checkout-session \
+  -H 'Content-Type: application/json'
+```
+
+Simulate a webhook without Stripe CLI
 
 ```bash
 curl -i -X POST -H 'Content-Type: application/json' \
--H 'stripe-signature: mock_signature' \
--d '{"type":"checkout.session.completed","data":{"object":{"id":"cs_test_123","customer_details":{"email":"test@example.com"}}}}' \
-http://localhost:4242/webhook
+  -H 'stripe-signature: mock_signature' \
+  -d '{"type":"checkout.session.completed","data":{"object":{"id":"cs_test_123","customer_details":{"email":"test@example.com"}}}}' \
+  http://localhost:4242/webhook
 ```
 
-**Expected Console Output:**
-```
+Expected output
+
+```text
 [SUCCESS] Payment for session cs_test_123 was successful!
 Fulfilling order for customer email: test@example.com
 ```
 
-*This engine allows your infrastructure to completely de-couple payment acceptance from application logic, maximizing reliability.*
+Forward real events with Stripe CLI
+
+```bash
+stripe listen --forward-to localhost:4242/webhook
+stripe trigger checkout.session.completed
+```
+
+## Verification
+
+In production, replace the mock branch in `server.js:1` with
+
+```js
+event = stripe.webhooks.constructEvent(request.body, sig, endpointSecret);
+```
+
+The service must return 400 on signature failure and 200 on success so Stripe stops retrying.
+
+## Limitations
+
+- Checkout Session creation is mocked and does not call Stripe
+- No database is included, order fulfillment is logged, not persisted
+- Mock signature path is for local testing only, not for production
+
+## Contributing
+
+Issues and pull requests are welcome. Enforce signature verification and keep the webhook handler free of side effects that can be retried.
+
+## License
+
+MIT. See `LICENSE`.
+

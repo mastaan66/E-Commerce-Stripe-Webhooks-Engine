@@ -18,7 +18,7 @@
   "description": "Event driven Node.js backend that verifies Stripe webhook signatures and fulfills orders",
   "dependencies": {
     "body-parser": "^2.2.2",
-    "express": "^5.2.1",
+    "express": "^5.3.0",
     "stripe": "^20.4.1"
   }
 }
